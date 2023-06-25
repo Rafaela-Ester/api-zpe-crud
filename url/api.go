@@ -2,91 +2,35 @@ package api
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/base64"
-
 	"encore.dev/storage/sqldb"
 )
 
-type URL struct {
-	ID  string // short-form URL id
-	URL string // complete URL, in long form
+//type Role string
+
+//const (
+/*Admin    Role = "Admin"
+Modifier Role = "Modifier"
+Watcher  Role = "Watcher"*/
+
+type User struct {
+	Name  string
+	Email string
+	//Role  Role
 }
 
-type ShortenParams struct {
-	URL string // the URL to shorten
-}
-
-// Shorten shortens a URL.
-//
-//encore:api public method=POST path=/url
-func Shorten(ctx context.Context, p *ShortenParams) (*URL, error) {
-	id, err := generateID()
+// encore:api public method=POST path=/users/{name}/{email}
+func createUser(ctx context.Context, user *User) error {
+	err := insert(ctx, user.Name, user.Email)
 	if err != nil {
-		return nil, err
-	} else if err := insert(ctx, id, p.URL); err != nil {
-		return nil, err
+		return err
 	}
-	return &URL{ID: id, URL: p.URL}, nil
+	return nil
 }
 
-// Get retrieves the original URL for the id.
-//
-//encore:api public method=GET path=/url/:id
-func Get(ctx context.Context, id string) (*URL, error) {
-	u := &URL{ID: id}
-	err := sqldb.QueryRow(ctx, `
-		SELECT original_url FROM url
-		WHERE id = $1
-	`, id).Scan(&u.URL)
-	return u, err
-}
-
-type ListResponse struct {
-	URLs []*URL
-}
-
-// List retrieves all URLs.
-//
-//encore:api public method=GET path=/url
-func List(ctx context.Context) (*ListResponse, error) {
-	rows, err := sqldb.Query(ctx, `
-		SELECT id, original_url FROM url
-	`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	urls := []*URL{}
-	for rows.Next() {
-		var u URL
-		if err := rows.Scan(&u.ID, &u.URL); err != nil {
-			return nil, err
-		}
-		urls = append(urls, &u)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return &ListResponse{URLs: urls}, nil
-}
-
-// generateID generates a random short ID.
-func generateID() (string, error) {
-	var data [6]byte // 6 bytes of entropy
-	if _, err := rand.Read(data[:]); err != nil {
-		return "", err
-	}
-	return base64.RawURLEncoding.EncodeToString(data[:]), nil
-}
-
-// insert inserts a URL into the database.
-func insert(ctx context.Context, id, url string) error {
+func insert(ctx context.Context, name string, email string) error {
 	_, err := sqldb.Exec(ctx, `
-		INSERT INTO url (id, original_url)
+		INSERT INTO users (name, email)
 		VALUES ($1, $2)
-	`, id, url)
+	`, name, email)
 	return err
 }
